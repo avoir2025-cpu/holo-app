@@ -150,7 +150,7 @@ function renderAnalysis(person, a) {
     <div class="muted" style="margin:-6px 0 10px">${esc(a.birthday||"")}｜主性格 <b style="color:var(--gold2)">${m.n} 號人</b>｜${esc(d.label)}</div>
 
     <div class="card"><div class="label">全息圖</div>${chartSvg(c)}
-      ${freqGrid(c)}
+      ${weightGrid(a)}
       <div class="muted sec">多（${esc(a.presenceMeaning?.many||"")}）：${a.presence.many.join("、")||"—"}<br>
       剛好（${esc(a.presenceMeaning?.just||"")}）：${a.presence.just.join("、")||"—"}<br>
       內沒外有：${a.presence.outer_only.join("、")||"—"}｜內外皆無（${esc(a.presenceMeaning?.none||"")}）：${a.presence.none.join("、")||"—"}</div>
@@ -199,32 +199,32 @@ function renderAnalysis(person, a) {
       <button class="ghost sm" onclick="delPerson('${person.id}')">刪除此人</button></div></div>` : ""}`;
 }
 
-function freqGrid(c) {
-  const core = [c.O, c.M, c.N, c.I, c.J, c.K, c.L]; // 內圈 7 個計算位
-  const cnt = {}; for (let n = 1; n <= 9; n++) cnt[n] = core.filter((x) => x === n).length;
-  const missing = Object.keys(cnt).filter((n) => cnt[n] === 0);
+function weightGrid(a) {
+  const w = a.presence?.weight || {}; // 內圈 7 位權重加總（主60/星10·10/其餘各5）
+  const nums = Array.from({ length: 9 }, (_, i) => i + 1);
+  const missing = nums.filter((n) => !w[n]);
   return `${missing.length ? `<div class="sec"><span class="label">內圈缺少：</span>${missing.map((n)=>`<span class="chip miss">${n}</span>`).join("")}</div>` : ""}
-  <div class="grid9">${Object.keys(cnt).map((n)=>`<div class="cell ${cnt[n] ? "on" : "zero"}"><b>${n}</b><div class="muted">${cnt[n]}次</div></div>`).join("")}</div>`;
+  <div class="grid9">${nums.map((n)=>`<div class="cell ${w[n] ? "on" : "zero"}"><b>${n}</b><div class="muted">${w[n] || 0}%</div></div>`).join("")}</div>`;
 }
 
 function chartSvg(c) {
   const t = (x, y, v, size = 20, color = "var(--tx)", w = 400) =>
     `<text x="${x}" y="${y}" font-size="${size}" text-anchor="middle" font-weight="${w}" fill="${color}">${v}</text>`;
-  return `<svg viewBox="0 0 340 300" style="width:100%;max-width:340px;display:block;margin:0 auto">
-    ${t(170, 28, c.R, 22, "var(--gold2)", 700)}
-    ${t(140, 58, c.Q)} ${t(200, 58, c.P)}
-    <path d="M60 110 Q170 40 280 110" stroke="var(--line)" fill="none" stroke-width="2"/>
-    ${t(30, 106, c.S, 18, "var(--dim)")} ${t(62, 88, c.X, 16, "var(--dim)")} ${t(92, 76, c.W, 16, "var(--dim)")}
-    ${t(310, 106, c.T, 18, "var(--dim)")} ${t(278, 88, c.V, 16, "var(--dim)")} ${t(248, 76, c.U, 16, "var(--dim)")}
-    ${t(170, 118, c.O, 34, "var(--gold2)", 700)}
-    <text x="170" y="138" font-size="11" text-anchor="middle" fill="var(--dim)">主性格</text>
-    <line x1="90" y1="160" x2="250" y2="160" stroke="var(--line)" stroke-width="2"/>
-    ${t(130, 190, c.M, 24)} ${t(210, 190, c.N, 24)}
-    <line x1="60" y1="212" x2="280" y2="212" stroke="var(--line)" stroke-width="2"/>
-    ${t(90, 245, c.I, 24, "var(--gold)", 700)} ${t(143, 245, c.J, 24)} ${t(197, 245, c.K, 24)} ${t(250, 245, c.L, 24, "var(--gold)", 700)}
-    <text x="90" y="262" font-size="10" text-anchor="middle" fill="var(--gold)">★破冰</text>
-    <text x="250" y="262" font-size="10" text-anchor="middle" fill="var(--gold)">★</text>
-    ${t(170, 288, c.digits.join(" "), 14, "var(--dim)")}
+  return `<svg viewBox="0 0 360 300" style="width:100%;max-width:360px;display:block;margin:0 auto">
+    ${t(180, 28, c.R, 22, "var(--gold2)", 700)}
+    ${t(150, 58, c.Q)} ${t(210, 58, c.P)}
+    <path d="M85 115 Q180 42 275 115" stroke="var(--line)" fill="none" stroke-width="2"/>
+    ${t(18, 112, c.S, 18, "var(--gold)", 700)} ${t(37, 112, "=", 14, "var(--dim)")} ${t(56, 112, c.X, 17, "var(--dim)")} ${t(76, 112, c.W, 17, "var(--dim)")}
+    ${t(284, 112, c.V, 17, "var(--dim)")} ${t(304, 112, c.U, 17, "var(--dim)")} ${t(323, 112, "=", 14, "var(--dim)")} ${t(342, 112, c.T, 18, "var(--gold)", 700)}
+    ${t(180, 122, c.O, 34, "var(--gold2)", 700)}
+    <text x="180" y="142" font-size="11" text-anchor="middle" fill="var(--dim)">主性格</text>
+    <line x1="100" y1="165" x2="260" y2="165" stroke="var(--line)" stroke-width="2"/>
+    ${t(140, 196, c.M, 24)} ${t(220, 196, c.N, 24)}
+    <line x1="70" y1="215" x2="290" y2="215" stroke="var(--line)" stroke-width="2"/>
+    ${t(100, 248, c.I, 24, "var(--gold)", 700)} ${t(153, 248, c.J, 24)} ${t(207, 248, c.K, 24)} ${t(260, 248, c.L, 24, "var(--gold)", 700)}
+    <text x="100" y="265" font-size="10" text-anchor="middle" fill="var(--gold)">★破冰</text>
+    <text x="260" y="265" font-size="10" text-anchor="middle" fill="var(--gold)">★卡點</text>
+    ${t(180, 292, c.digits.join(" "), 14, "var(--dim)")}
   </svg>`;
 }
 
@@ -245,12 +245,13 @@ function deb(fn, ms) { let h; return (...a) => { clearTimeout(h); h = setTimeout
 function devApi(path, opt) {
   const A = { birthday: "1980-10-06",
     chart: { digits: [0,6,1,0,1,9,8,0], I:6,J:1,K:1,L:8,M:7,N:9,O:7,P:5,Q:7,R:3,S:3,T:9,U:8,V:1,W:8,X:4 },
-    presence: { many: [7], just: [1,6,8,9], outer_only: [3,4,5], none: [2] },
+    presence: { many: [1,6,7,8], just: [9], outer_only: [3,4,5], none: [2],
+      weight: {1:10, 2:0, 3:0, 4:0, 5:0, 6:10, 7:65, 8:10, 9:5} },
     doctrine: { label: "示意主義", talk: "談XX", live: "活在示意中", money: "示意金錢觀", style: "示意溝通風格文案" },
     main: { n: 7, gift: "示意 特質", five: "示", talent: "示意能力", persona: "示意個性", expect: "示意期望",
       high: ["示意高1","示意高2"], low: ["示意低1","示意低2"], comm: { like: ["示意喜歡A","示意喜歡B"], hate: ["示意討厭A"] } },
     icebreaker: { n: 6, gift: "示意", talent: "示意能力", high: ["示意高1","示意高2"], note: "左星位 10%｜破冰切入" },
-    innerCode: { n: 8, gift: "示意", talent: "示意能力", expect: "示意期望", note: "右星位 10%" },
+    innerCode: { n: 8, gift: "示意", talent: "示意能力", expect: "示意期望", note: "右星位 10%｜卡點" },
     motivation: [6,1], energy: [1,8], subconscious: [6,8,7],
     presenceMeaning: { many: "示意明顯", just: "示意適中", outer_only: "示意外有", none: "示意缺" },
     deep: [
