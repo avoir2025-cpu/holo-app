@@ -147,18 +147,27 @@ function renderAnalysis(person, a) {
     </div>
 
     <div class="card">
-      <div class="row" style="gap:20px">
-        <div><div class="label">破冰切入（左星位 10%）</div><b>${a.icebreaker.n}</b>｜${esc(a.icebreaker.gift)}</div>
-        <div><div class="label">右星位 10%</div><b>${a.innerCode.n}</b>｜${esc(a.innerCode.gift)}</div>
-      </div>
-      <div class="sec muted">動機 ${a.motivation.join("・")}｜能量 ${a.energy.join("・")}｜潛意識 ${a.subconscious.join("・")}</div>
+      <div class="label">${esc(a.icebreaker.note||"破冰切入（左星位 10%）")}</div>
+      <div><b>${a.icebreaker.n}</b>｜${esc(a.icebreaker.gift)}｜${esc(a.icebreaker.talent)}</div>
+      ${a.icebreaker.high ? `<div>${chips(a.icebreaker.high, "like")}</div>` : ""}
+      <div class="sec"><div class="label">${esc(a.innerCode.note||"右星位 10%")}</div>
+      <div><b>${a.innerCode.n}</b>｜${esc(a.innerCode.gift)}｜${esc(a.innerCode.talent||"")}
+      ${a.innerCode.expect ? `・期望「${esc(a.innerCode.expect)}」` : ""}</div></div>
       ${a.outerOnlyNote ? `<div class="sec"><div class="label">內沒外有（${esc(a.outerOnlyNote.meaning)}）</div>
         ${a.outerOnlyNote.gifts.map((g)=>`<span class="chip">${esc(g)}</span>`).join("")}</div>` : ""}
     </div>
 
     <div class="card"><div class="label">全息圖</div>${chartSvg(c)}
-      <div class="muted">多：${a.presence.many.join("、")||"—"}｜剛好：${a.presence.just.join("、")||"—"}｜內沒外有：${a.presence.outer_only.join("、")||"—"}｜內外皆無：${a.presence.none.join("、")||"—"}</div>
+      <div class="muted">多（${esc(a.presenceMeaning?.many||"")}）：${a.presence.many.join("、")||"—"}<br>
+      剛好（${esc(a.presenceMeaning?.just||"")}）：${a.presence.just.join("、")||"—"}<br>
+      內沒外有：${a.presence.outer_only.join("、")||"—"}｜內外皆無（${esc(a.presenceMeaning?.none||"")}）：${a.presence.none.join("、")||"—"}</div>
     </div>
+
+    ${(a.deep||[]).map((s)=>`<div class="card">
+      <div class="label">${esc(s.title)}</div>
+      ${s.note ? `<div class="muted" style="margin-bottom:6px">${esc(s.note)}</div>` : ""}
+      ${s.nums.map((x)=>`<div>${x.tag?`<span class="muted">${esc(x.tag)} </span>`:""}<b>${x.n}</b>｜${esc(x.gift)}｜${esc(x.talent)}</div>`).join("")}
+    </div>`).join("")}
 
     ${person ? `<div class="card"><div class="label">複盤筆記</div>
       <div id="notes">${(person.notes||[]).map((n)=>`<div class="note">${esc(n.text)}<div class="muted">${n.ts.slice(0,10)}</div></div>`).join("")||'<div class="muted">還沒有筆記</div>'}</div>
@@ -209,8 +218,15 @@ function devApi(path, opt) {
     doctrine: { label: "示意主義", talk: "談XX", live: "活在示意中", money: "示意金錢觀", style: "示意溝通風格文案" },
     main: { n: 7, gift: "示意 特質", five: "示", talent: "示意能力", persona: "示意個性", expect: "示意期望",
       high: ["示意高1","示意高2"], low: ["示意低1","示意低2"], comm: { like: ["示意喜歡A","示意喜歡B"], hate: ["示意討厭A"] } },
-    icebreaker: { n: 6, gift: "示意" }, innerCode: { n: 8, gift: "示意" },
+    icebreaker: { n: 6, gift: "示意", talent: "示意能力", high: ["示意高1","示意高2"], note: "左星位 10%｜破冰切入" },
+    innerCode: { n: 8, gift: "示意", talent: "示意能力", expect: "示意期望", note: "右星位 10%" },
     motivation: [6,1], energy: [1,8], subconscious: [6,8,7],
+    presenceMeaning: { many: "示意明顯", just: "示意適中", outer_only: "示意外有", none: "示意缺" },
+    deep: [
+      { title: "內圈 5% 位", note: "示意說明", nums: [{tag:"下排",n:1,gift:"示意",talent:"示意能力"},{tag:"中排",n:7,gift:"示意",talent:"示意能力"}] },
+      { title: "動機（起心動念）＝下排左二碼", nums: [{n:6,gift:"示意",talent:"示意能力"},{n:1,gift:"示意",talent:"示意能力"}] },
+      { title: "外圈 21–40 歲｜工作·人際", note: "示意外圈說明", nums: [{n:4,gift:"示意",talent:"示意能力"},{n:8,gift:"示意",talent:"示意能力"},{tag:"總",n:3,gift:"示意",talent:"示意能力"}] },
+    ],
     outerOnlyNote: { nums: [3,4,5], meaning: "示意說明", gifts: ["3＝示意","4＝示意","5＝示意"] } };
   const P = { id: "00000000-0000-4000-8000-000000000000", name: "測試客戶", birthday: "1980-10-06",
     tags: ["客戶"], notes: [{ ts: "2026-08-31T00:00:00Z", text: "示意筆記" }] };
