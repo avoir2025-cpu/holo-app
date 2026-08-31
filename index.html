@@ -59,7 +59,7 @@ const CFG = {
 const $ = (s) => document.querySelector(s);
 const app = $("#app");
 let idToken = null;
-const CATS = ["潛客", "客戶", "夥伴", "朋友", "家人"];
+const CATS = ["本人", "潛客", "客戶", "夥伴", "朋友", "家人"];
 let curCat = "";   // 首頁分類篩選
 let allPeople = [];
 
@@ -96,7 +96,8 @@ function renderList() {
   const people = curCat ? allPeople.filter((p) => (p.tags || []).includes(curCat)) : allPeople;
   $("#list").innerHTML = people.length
     ? people.map((p) => `<div class="person" onclick="viewPerson('${p.id}')">
-        <div><b>${esc(p.name)}</b> <span class="muted">${p.birthday}</span></div>
+        <div><b>${esc(p.name)}</b>${p.main_n ? ` <b style="color:var(--gold2)">${p.main_n}號人</b> <span class="muted">${esc(p.doctrine||"")}</span>` : ""}
+          <div class="muted">${p.birthday}</div></div>
         <div>${(p.tags||[]).map((t)=>`<span class="chip">${esc(t)}</span>`).join("")}</div></div>`).join("")
     : `<div class="muted">${curCat ? `「${esc(curCat)}」分類還沒有人。` : "還沒有名單，按右上「＋建檔」開始。"}</div>`;
 }
@@ -155,7 +156,10 @@ function renderAnalysis(person, a) {
         ${CATS.map((cat) => `<option${cat === curCatOf ? " selected" : ""}>${cat}</option>`).join("")}
       </select>` : ""}</div>
       <button class="ghost sm" onclick="viewHome()">← 返回</button></div>
-    <div class="muted" style="margin:0 0 10px">${esc(a.birthday||"")}｜主性格 <b style="color:var(--gold2)">${m.n} 號人</b>｜${esc(d.label)}</div>
+    <div class="row" style="margin:0 0 10px;justify-content:space-between">
+      <span class="muted">${esc(a.birthday||"")}｜主性格 <b style="color:var(--gold2)">${m.n} 號人</b>｜${esc(d.label)}</span>
+      ${person && !(person.tags||[]).includes("本人") ? `<button class="ghost sm" onclick="goCompare()">⇄ 本人對照</button>` : ""}
+    </div>
 
     <div class="card"><div class="label">全息圖</div>${chartSvg(c)}
       ${weightGrid(a)}
@@ -171,9 +175,18 @@ function renderAnalysis(person, a) {
         <div class="muted">${esc(d.live)}・${esc(d.money)}</div></div>
       </div>
       <div class="sec"><div class="label">溝通風格</div>${esc(d.style)}</div>
+      ${a.persuasion ? `<div class="sec"><div class="label">說服路線</div><b style="color:var(--gold2)">${esc(a.persuasion)}</b></div>` : ""}
+      ${a.buy || a.consume ? `<div class="sec"><div class="label">消費觀</div>${esc(a.buy||"")}${a.consume ? `<br>${m.n} 號：${esc(a.consume)}` : ""}</div>` : ""}
+      ${a.visionaryTimeline ? `<div class="sec muted">${esc(a.visionaryTimeline)}</div>` : ""}
       <div class="sec"><div class="label">他喜歡</div>${chips(m.comm.like, "like")}</div>
       <div><div class="label">他討厭（踩了就掉單）</div>${chips(m.comm.hate, "hate")}</div>
     </div>
+
+    ${(a.combos||[]).length ? `<div class="card"><div class="label">組合特質（內圈同時具備）</div>
+      ${a.combos.map((cb)=>`<div><b style="color:var(--gold2)">${cb.nums.join("·")}</b>${cb.label?` <span class="chip">${esc(cb.label)}</span>`:""}｜${esc(cb.text)}</div>`).join("")}</div>` : ""}
+
+    ${(a.haveMissing||[]).length ? `<div class="card"><div class="label">有無判讀</div>
+      ${a.haveMissing.map((h)=>`<div><b>${h.has?"有":"沒"} ${h.n}</b>｜${esc(h.text)}</div>`).join("")}</div>` : ""}
 
     <div class="card">
       <div class="label">主性格 ${m.n}｜${esc(m.gift)}（五行屬${esc(m.five)}）</div>
@@ -181,6 +194,8 @@ function renderAnalysis(person, a) {
       <div>自我期望：<b>${esc(m.expect)}</b></div>
       <div class="sec"><div class="label">高能量</div>${chips(m.high, "like")}</div>
       <div><div class="label">低能量</div>${chips(m.low, "hate")}</div>
+      ${(m.depth||[]).length ? `<div class="sec"><div class="label">課堂筆記</div>
+        ${m.depth.map((li)=>`<div>・${esc(li)}</div>`).join("")}</div>` : ""}
     </div>
 
     <div class="card">
@@ -201,8 +216,9 @@ function renderAnalysis(person, a) {
     </div>`).join("")}
 
     ${person ? `<div class="card"><div class="label">複盤筆記</div>
-      <div id="notes">${(person.notes||[]).map((n)=>`<div class="note">${esc(n.text)}<div class="muted">${n.ts.slice(0,10)}</div></div>`).join("")||'<div class="muted">還沒有筆記</div>'}</div>
+      <div id="notes">${(person.notes||[]).map((n)=>`<div class="note">${n.verdict?`<span class="chip ${n.verdict==="準"?"like":n.verdict==="不準"?"hate":""}">${esc(n.verdict)}</span> `:""}${esc(n.text)}<div class="muted">${n.ts.slice(0,10)}</div></div>`).join("")||'<div class="muted">還沒有筆記</div>'}</div>
       <div class="sec"><textarea id="newnote" rows="2" placeholder="這次聊完：哪裡準、哪裡不準、下一步…"></textarea></div>
+      <div class="row" style="margin-top:6px"><span class="label" style="margin:0">這次判讀：</span>${["準","部分","不準"].map((v)=>`<span class="chip tap" data-v="${v}" onclick="selVerd(this)">${v}</span>`).join("")}</div>
       <div class="row sec"><button class="sm" onclick="addNote('${person.id}')">存筆記</button>
       <button class="ghost sm" onclick="delPerson('${person.id}')">刪除此人</button></div></div>` : ""}`;
 }
@@ -242,11 +258,47 @@ async function setPersonCat(id, cat) {
   await api("/people/" + id, { method: "PATCH", body: JSON.stringify({ tags }) });
   if (window.curPerson) window.curPerson.tags = tags;
 }
+function selVerd(el) {
+  const on = el.classList.contains("sel");
+  el.parentElement.querySelectorAll(".chip").forEach((c) => c.classList.remove("sel"));
+  if (!on) el.classList.add("sel");
+}
 async function addNote(id) {
   const text = $("#newnote").value.trim();
   if (!text) return;
-  await api("/people/" + id, { method: "PATCH", body: JSON.stringify({ add_note: text }) });
+  const verdict = document.querySelector('[data-v].sel')?.dataset.v || null;
+  await api("/people/" + id, { method: "PATCH", body: JSON.stringify({ add_note: text, verdict }) });
   viewPerson(id);
+}
+async function goCompare() {
+  const other = window.curPerson;
+  if (!other) return;
+  try {
+    const { people } = await api("/people");
+    const selfP = people.find((p) => (p.tags || []).includes("本人"));
+    if (!selfP) return alert("請先把自己建檔，分類選「本人」，就能用對照功能。");
+    const [meR, otR] = await Promise.all([api("/people/" + selfP.id), api("/people/" + other.id)]);
+    renderCompare(meR, otR);
+  } catch (e) { alert(e.message); }
+}
+function renderCompare(meR, otR) {
+  const half = (tag, r, mine) => {
+    const m = r.analysis.main, d = r.analysis.doctrine;
+    return `<div class="card${mine ? "" : " gold"}">
+      <div class="label">${tag}</div>
+      <div><b>${esc(r.person.name)}</b>｜<b style="color:var(--gold2)">${m.n} 號人</b>｜${esc(d.label)}・${esc(d.talk)}</div>
+      ${mine ? `<div class="sec"><div class="label">我的高能量（放大用）</div>${m.high.map((x)=>`<span class="chip like">${esc(x)}</span>`).join("")}</div>
+        <div><div class="label">我的低能量（收著點）</div>${m.low.map((x)=>`<span class="chip hate">${esc(x)}</span>`).join("")}</div>`
+      : `${r.analysis.persuasion ? `<div class="sec"><div class="label">說服路線</div><b style="color:var(--gold2)">${esc(r.analysis.persuasion)}</b>｜${esc(r.analysis.buy||"")}</div>` : ""}
+        <div class="sec"><div class="label">他喜歡</div>${m.comm.like.map((x)=>`<span class="chip like">${esc(x)}</span>`).join("")}</div>
+        <div><div class="label">他討厭</div>${m.comm.hate.map((x)=>`<span class="chip hate">${esc(x)}</span>`).join("")}</div>`}
+    </div>`;
+  };
+  app.innerHTML = `
+    <div class="topbar"><h1>本人對照</h1>
+      <button class="ghost sm" onclick="viewPerson('${otR.person.id}')">← 返回</button></div>
+    ${half("我", meR, true)}
+    ${half("對方", otR, false)}`;
 }
 async function delPerson(id) {
   if (!confirm("確定刪除？")) return;
@@ -263,7 +315,11 @@ function devApi(path, opt) {
       weight: {1:10, 2:0, 3:0, 4:0, 5:0, 6:10, 7:65, 8:10, 9:5} },
     doctrine: { label: "示意主義", talk: "談XX", live: "活在示意中", money: "示意金錢觀", style: "示意溝通風格文案" },
     main: { n: 7, gift: "示意 特質", five: "示", talent: "示意能力", persona: "示意個性", expect: "示意期望",
-      high: ["示意高1","示意高2"], low: ["示意低1","示意低2"], comm: { like: ["示意喜歡A","示意喜歡B"], hate: ["示意討厭A"] } },
+      high: ["示意高1","示意高2"], low: ["示意低1","示意低2"], comm: { like: ["示意喜歡A","示意喜歡B"], hate: ["示意討厭A"] },
+      depth: ["示意課堂筆記一", "示意課堂筆記二"] },
+    persuasion: "示意路線", buy: "示意消費軸", consume: "示意消費觀", visionaryTimeline: null,
+    combos: [{ nums: [1,6,8], label: null, text: "示意組合" }, { nums: [1,8], text: "示意組合二" }],
+    haveMissing: [{ n: 2, has: false, text: "示意沒2" }, { n: 6, has: true, text: "示意有6" }],
     icebreaker: { n: 6, gift: "示意", talent: "示意能力", high: ["示意高1","示意高2"], note: "左星位 10%｜破冰切入" },
     innerCode: { n: 8, gift: "示意", talent: "示意能力", expect: "示意期望", note: "右星位 10%｜卡點" },
     motivation: [6,1], energy: [1,8], subconscious: [6,8,7],
@@ -275,7 +331,8 @@ function devApi(path, opt) {
     ],
     outerOnlyNote: { nums: [3,4,5], meaning: "示意說明", gifts: ["3＝示意","4＝示意","5＝示意"] } };
   const P = { id: "00000000-0000-4000-8000-000000000000", name: "測試客戶", birthday: "1980-10-06",
-    tags: ["客戶"], notes: [{ ts: "2026-08-31T00:00:00Z", text: "示意筆記" }] };
+    tags: ["客戶"], main_n: 7, doctrine: "示意主義",
+    notes: [{ ts: "2026-08-31T00:00:00Z", text: "示意筆記", verdict: "準" }] };
   if (path.startsWith("/analyze")) return { analysis: A };
   if (path.startsWith("/people/")) return { person: P, analysis: A };
   if (path.startsWith("/people")) return opt.method === "POST" ? { person: P } : { people: [P] };
