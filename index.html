@@ -282,23 +282,33 @@ async function goCompare() {
   } catch (e) { alert(e.message); }
 }
 function renderCompare(meR, otR) {
-  const half = (tag, r, mine) => {
-    const m = r.analysis.main, d = r.analysis.doctrine;
-    return `<div class="card${mine ? "" : " gold"}">
-      <div class="label">${tag}</div>
-      <div><b>${esc(r.person.name)}</b>｜<b style="color:var(--gold2)">${m.n} 號人</b>｜${esc(d.label)}・${esc(d.talk)}</div>
-      ${mine ? `<div class="sec"><div class="label">我的高能量（放大用）</div>${m.high.map((x)=>`<span class="chip like">${esc(x)}</span>`).join("")}</div>
-        <div><div class="label">我的低能量（收著點）</div>${m.low.map((x)=>`<span class="chip hate">${esc(x)}</span>`).join("")}</div>`
-      : `${r.analysis.persuasion ? `<div class="sec"><div class="label">說服路線</div><b style="color:var(--gold2)">${esc(r.analysis.persuasion)}</b>｜${esc(r.analysis.buy||"")}</div>` : ""}
-        <div class="sec"><div class="label">他喜歡</div>${m.comm.like.map((x)=>`<span class="chip like">${esc(x)}</span>`).join("")}</div>
-        <div><div class="label">他討厭</div>${m.comm.hate.map((x)=>`<span class="chip hate">${esc(x)}</span>`).join("")}</div>`}
-    </div>`;
-  };
+  const me = meR.analysis, ot = otR.analysis;
+  const chip = (arr, cls) => arr.map((x) => `<span class="chip ${cls}">${esc(x)}</span>`).join("");
   app.innerHTML = `
-    <div class="topbar"><h1>本人對照</h1>
+    <div class="topbar"><h1>成交 ${esc(otR.person.name)}</h1>
       <button class="ghost sm" onclick="viewPerson('${otR.person.id}')">← 返回</button></div>
-    ${half("我", meR, true)}
-    ${half("對方", otR, false)}`;
+    <div class="muted" style="margin:0 0 10px">我 <b style="color:var(--gold2)">${me.main.n} 號人</b>（${esc(me.doctrine.label)}） → 對方 <b style="color:var(--gold2)">${ot.main.n} 號人</b>（${esc(ot.doctrine.label)}）</div>
+
+    <div class="card gold">
+      <div class="label">怎麼成交他</div>
+      <div>🚪 <b>破冰</b>：從 <b style="color:var(--gold2)">${ot.icebreaker.n}</b>｜${esc(ot.icebreaker.gift)} 切入（左星位）</div>
+      <div class="sec">🎯 <b>主軸</b>：<b style="color:var(--gold2)">${esc(ot.doctrine.talk)}</b>｜${esc(ot.doctrine.money)}${ot.buy ? `<br><span class="muted">${esc(ot.buy)}</span>` : ""}</div>
+      ${ot.persuasion ? `<div class="sec">🗣 <b>說服路線</b>：<b style="color:var(--gold2)">${esc(ot.persuasion)}</b></div>` : ""}
+      ${ot.visionaryTimeline ? `<div class="muted">${esc(ot.visionaryTimeline)}</div>` : ""}
+      <div class="sec"><div class="label">做這些（他喜歡）</div>${chip(ot.main.comm.like, "like")}</div>
+      <div><div class="label">千萬別踩（他討厭）</div>${chip(ot.main.comm.hate, "hate")}</div>
+      ${(ot.haveMissing||[]).length ? `<div class="sec"><div class="label">應對要點</div>
+        ${ot.haveMissing.map((h)=>`<div>・<b>${h.has?"有":"沒"} ${h.n}</b>｜${esc(h.text)}</div>`).join("")}</div>` : ""}
+      <div class="sec">⚠ <b>卡點</b>：<b style="color:var(--gold2)">${ot.innerCode.n}</b>｜${esc(ot.innerCode.gift)}（右星位——談不動時，卡的多半在這）</div>
+    </div>
+
+    <div class="card">
+      <div class="label">我要小心什麼</div>
+      <div><div class="label">我的低能量（在他面前收斂）</div>${chip(me.main.low, "hate")}</div>
+      <div class="sec"><div class="label">對照上面「他討厭」逐一檢查——你的低能量撞到他的雷，單就掉了</div></div>
+      <div><div class="label">我的高能量（放大這些優勢）</div>${chip(me.main.high, "like")}</div>
+      ${me.doctrine.key !== ot.doctrine.key ? `<div class="sec muted">提醒：你是${esc(me.doctrine.label)}（${esc(me.doctrine.talk)}），對方是${esc(ot.doctrine.label)}（${esc(ot.doctrine.talk)}）——別用你自己習慣被打動的方式去談他。</div>` : ""}
+    </div>`;
 }
 async function delPerson(id) {
   if (!confirm("確定刪除？")) return;
@@ -333,9 +343,11 @@ function devApi(path, opt) {
   const P = { id: "00000000-0000-4000-8000-000000000000", name: "測試客戶", birthday: "1980-10-06",
     tags: ["客戶"], main_n: 7, doctrine: "示意主義",
     notes: [{ ts: "2026-08-31T00:00:00Z", text: "示意筆記", verdict: "準" }] };
+  const S = { ...P, id: "11111111-0000-4000-8000-000000000000", name: "我自己", tags: ["本人"] };
   if (path.startsWith("/analyze")) return { analysis: A };
+  if (path.startsWith("/people/1111")) return { person: S, analysis: A };
   if (path.startsWith("/people/")) return { person: P, analysis: A };
-  if (path.startsWith("/people")) return opt.method === "POST" ? { person: P } : { people: [P] };
+  if (path.startsWith("/people")) return opt.method === "POST" ? { person: P } : { people: [P, S] };
   return {};
 }
 
