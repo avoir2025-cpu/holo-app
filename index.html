@@ -142,6 +142,7 @@ async function viewPerson(id) {
 }
 
 function renderAnalysis(person, a) {
+  window.curPerson = person;
   const c = a.chart, m = a.main, d = a.doctrine;
   const chips = (arr, cls) => arr.map((x) => `<span class="chip ${cls}">${esc(x)}</span>`).join("");
   app.innerHTML = `
@@ -192,6 +193,10 @@ function renderAnalysis(person, a) {
       ${s.nums.map((x)=>`<div>${x.tag?`<span class="muted">${esc(x.tag)} </span>`:""}<b>${x.n}</b>｜${esc(x.gift)}｜${esc(x.talent)}</div>`).join("")}
     </div>`).join("")}
 
+    ${person ? `<div class="card"><div class="label">分類（點選即存）</div>
+      <div class="row">${CATS.map((cat) => `<span class="chip tap${(person.tags||[]).includes(cat) ? " sel" : ""}"
+        onclick="toggleTag('${person.id}', '${cat}')">${cat}</span>`).join("")}</div></div>` : ""}
+
     ${person ? `<div class="card"><div class="label">複盤筆記</div>
       <div id="notes">${(person.notes||[]).map((n)=>`<div class="note">${esc(n.text)}<div class="muted">${n.ts.slice(0,10)}</div></div>`).join("")||'<div class="muted">還沒有筆記</div>'}</div>
       <div class="sec"><textarea id="newnote" rows="2" placeholder="這次聊完：哪裡準、哪裡不準、下一步…"></textarea></div>
@@ -228,6 +233,12 @@ function chartSvg(c) {
   </svg>`;
 }
 
+async function toggleTag(id, cat) {
+  const tags = new Set(window.curPerson?.tags || []);
+  tags.has(cat) ? tags.delete(cat) : tags.add(cat);
+  await api("/people/" + id, { method: "PATCH", body: JSON.stringify({ tags: [...tags] }) });
+  viewPerson(id);
+}
 async function addNote(id) {
   const text = $("#newnote").value.trim();
   if (!text) return;
