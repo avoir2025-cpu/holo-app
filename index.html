@@ -25,6 +25,14 @@ input:focus,textarea:focus{outline:1px solid var(--gold)}
 .chip{display:inline-block;background:#2a2417;border:1px solid var(--line);border-radius:999px;padding:2px 10px;font-size:.85rem;margin:2px}
 .chip.like{border-color:var(--green);color:#b9d4ad}
 .chip.hate{border-color:var(--red);color:#e0a89e}
+.chip.sel{background:var(--gold);border-color:var(--gold);color:#1a150c;font-weight:600}
+.chip.tap{cursor:pointer;padding:5px 14px;font-size:.95rem}
+.chip.miss{border-color:var(--red);color:#e0a89e;font-weight:700}
+.grid9{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px}
+.grid9 .cell{border:1px solid var(--line);border-radius:10px;text-align:center;padding:6px 2px}
+.grid9 .cell b{font-size:1.2rem}
+.grid9 .cell.on{border-color:var(--gold)}
+.grid9 .cell.zero{opacity:.45}
 .bignum{font-size:2.6rem;font-weight:700;color:var(--gold2);line-height:1}
 .person{display:flex;justify-content:space-between;align-items:center;padding:12px 4px;border-bottom:1px solid var(--line);cursor:pointer}
 .person:active{background:#211c14}
@@ -51,6 +59,9 @@ const CFG = {
 const $ = (s) => document.querySelector(s);
 const app = $("#app");
 let idToken = null;
+const CATS = ["潛客", "客戶", "夥伴", "朋友", "家人"];
+let curCat = "";   // 首頁分類篩選
+let allPeople = [];
 
 async function api(path, opt = {}) {
   if (CFG.DEV) return devApi(path, opt);
@@ -71,6 +82,8 @@ async function viewHome(q = "") {
   app.innerHTML = `
     <div class="topbar"><h1>全息圖速查</h1><button class="sm" onclick="viewAdd()">＋ 建檔</button></div>
     <input id="q" placeholder="🔍 打名字快速查找…" value="${esc(q)}">
+    <div class="row sec" id="catbar">${["", ...CATS].map((c) =>
+      `<span class="chip tap${c === curCat ? " sel" : ""}" onclick="setCat('${c}')">${c || "全部"}</span>`).join("")}</div>
     <div class="card sec"><div class="label">快速排盤（不存檔）</div>
       <div class="row"><input id="qbd" type="date" style="flex:1">
       <button class="sm" onclick="quickAnalyze()">排盤</button></div></div>
@@ -78,14 +91,20 @@ async function viewHome(q = "") {
   $("#q").oninput = deb(() => loadList($("#q").value), 250);
   loadList(q);
 }
+function setCat(c) { curCat = c; viewHome($("#q") ? $("#q").value : ""); }
+function renderList() {
+  const people = curCat ? allPeople.filter((p) => (p.tags || []).includes(curCat)) : allPeople;
+  $("#list").innerHTML = people.length
+    ? people.map((p) => `<div class="person" onclick="viewPerson('${p.id}')">
+        <div><b>${esc(p.name)}</b> <span class="muted">${p.birthday}</span></div>
+        <div>${(p.tags||[]).map((t)=>`<span class="chip">${esc(t)}</span>`).join("")}</div></div>`).join("")
+    : `<div class="muted">${curCat ? `「${esc(curCat)}」分類還沒有人。` : "還沒有名單，按右上「＋建檔」開始。"}</div>`;
+}
 async function loadList(q) {
   try {
     const { people } = await api("/people" + (q ? "?q=" + encodeURIComponent(q) : ""));
-    $("#list").innerHTML = people.length
-      ? people.map((p) => `<div class="person" onclick="viewPerson('${p.id}')">
-          <div><b>${esc(p.name)}</b> <span class="muted">${p.birthday}</span></div>
-          <div>${(p.tags||[]).map((t)=>`<span class="chip">${esc(t)}</span>`).join("")}</div></div>`).join("")
-      : `<div class="muted">還沒有名單，按右上「＋建檔」開始。</div>`;
+    allPeople = people;
+    renderList();
   } catch (e) { $("#list").innerHTML = `<div class="err">${esc(e.message)}</div>`; }
 }
 
@@ -95,13 +114,15 @@ function viewAdd() {
     <div class="card">
       <div class="label">姓名</div><input id="f_name">
       <div class="label sec">生日（國曆西元）</div><input id="f_bd" type="date">
-      <div class="label sec">標籤（逗號分隔，例：客戶,保險業）</div><input id="f_tags">
+      <div class="label sec">分類（點選，可複選）</div>
+      <div class="row" id="f_cats">${CATS.map((c) =>
+        `<span class="chip tap" data-cat="${c}" onclick="this.classList.toggle('sel')">${c}</span>`).join("")}</div>
       <div class="sec"><button onclick="doAdd()">儲存並排盤</button></div>
       <div id="msg"></div></div>`;
 }
 async function doAdd() {
   try {
-    const tags = $("#f_tags").value.split(/[,，]/).map((s)=>s.trim()).filter(Boolean);
+    const tags = [...document.querySelectorAll("#f_cats .chip.sel")].map((el) => el.dataset.cat);
     const { person } = await api("/people", { method: "POST",
       body: JSON.stringify({ name: $("#f_name").value.trim(), birthday: $("#f_bd").value, tags }) });
     viewPerson(person.id);
@@ -126,6 +147,14 @@ function renderAnalysis(person, a) {
   app.innerHTML = `
     <div class="topbar"><h1>${person ? esc(person.name) : "快速排盤"}</h1>
       <button class="ghost sm" onclick="viewHome()">← 返回</button></div>
+    <div class="muted" style="margin:-6px 0 10px">${esc(a.birthday||"")}｜主性格 <b style="color:var(--gold2)">${m.n} 號人</b>｜${esc(d.label)}</div>
+
+    <div class="card"><div class="label">全息圖</div>${chartSvg(c)}
+      ${freqGrid(c)}
+      <div class="muted sec">多（${esc(a.presenceMeaning?.many||"")}）：${a.presence.many.join("、")||"—"}<br>
+      剛好（${esc(a.presenceMeaning?.just||"")}）：${a.presence.just.join("、")||"—"}<br>
+      內沒外有：${a.presence.outer_only.join("、")||"—"}｜內外皆無（${esc(a.presenceMeaning?.none||"")}）：${a.presence.none.join("、")||"—"}</div>
+    </div>
 
     <div class="card gold">
       <div class="row" style="justify-content:space-between">
@@ -157,12 +186,6 @@ function renderAnalysis(person, a) {
         ${a.outerOnlyNote.gifts.map((g)=>`<span class="chip">${esc(g)}</span>`).join("")}</div>` : ""}
     </div>
 
-    <div class="card"><div class="label">全息圖</div>${chartSvg(c)}
-      <div class="muted">多（${esc(a.presenceMeaning?.many||"")}）：${a.presence.many.join("、")||"—"}<br>
-      剛好（${esc(a.presenceMeaning?.just||"")}）：${a.presence.just.join("、")||"—"}<br>
-      內沒外有：${a.presence.outer_only.join("、")||"—"}｜內外皆無（${esc(a.presenceMeaning?.none||"")}）：${a.presence.none.join("、")||"—"}</div>
-    </div>
-
     ${(a.deep||[]).map((s)=>`<div class="card">
       <div class="label">${esc(s.title)}</div>
       ${s.note ? `<div class="muted" style="margin-bottom:6px">${esc(s.note)}</div>` : ""}
@@ -174,6 +197,14 @@ function renderAnalysis(person, a) {
       <div class="sec"><textarea id="newnote" rows="2" placeholder="這次聊完：哪裡準、哪裡不準、下一步…"></textarea></div>
       <div class="row sec"><button class="sm" onclick="addNote('${person.id}')">存筆記</button>
       <button class="ghost sm" onclick="delPerson('${person.id}')">刪除此人</button></div></div>` : ""}`;
+}
+
+function freqGrid(c) {
+  const core = [c.O, c.M, c.N, c.I, c.J, c.K, c.L]; // 內圈 7 個計算位
+  const cnt = {}; for (let n = 1; n <= 9; n++) cnt[n] = core.filter((x) => x === n).length;
+  const missing = Object.keys(cnt).filter((n) => cnt[n] === 0);
+  return `${missing.length ? `<div class="sec"><span class="label">內圈缺少：</span>${missing.map((n)=>`<span class="chip miss">${n}</span>`).join("")}</div>` : ""}
+  <div class="grid9">${Object.keys(cnt).map((n)=>`<div class="cell ${cnt[n] ? "on" : "zero"}"><b>${n}</b><div class="muted">${cnt[n]}次</div></div>`).join("")}</div>`;
 }
 
 function chartSvg(c) {
