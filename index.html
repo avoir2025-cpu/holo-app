@@ -114,15 +114,15 @@ function viewAdd() {
     <div class="card">
       <div class="label">姓名</div><input id="f_name">
       <div class="label sec">生日（國曆西元）</div><input id="f_bd" type="date">
-      <div class="label sec">分類（點選，可複選）</div>
-      <div class="row" id="f_cats">${CATS.map((c) =>
-        `<span class="chip tap" data-cat="${c}" onclick="this.classList.toggle('sel')">${c}</span>`).join("")}</div>
+      <div class="label sec">分類</div>
+      <select id="f_cat"><option value="">未分類</option>${CATS.map((c) => `<option>${c}</option>`).join("")}</select>
       <div class="sec"><button onclick="doAdd()">儲存並排盤</button></div>
       <div id="msg"></div></div>`;
 }
 async function doAdd() {
   try {
-    const tags = [...document.querySelectorAll("#f_cats .chip.sel")].map((el) => el.dataset.cat);
+    const v = $("#f_cat").value;
+    const tags = v ? [v] : [];
     const { person } = await api("/people", { method: "POST",
       body: JSON.stringify({ name: $("#f_name").value.trim(), birthday: $("#f_bd").value, tags }) });
     viewPerson(person.id);
@@ -145,10 +145,17 @@ function renderAnalysis(person, a) {
   window.curPerson = person;
   const c = a.chart, m = a.main, d = a.doctrine;
   const chips = (arr, cls) => arr.map((x) => `<span class="chip ${cls}">${esc(x)}</span>`).join("");
+  const curCatOf = person ? (person.tags || []).find((t) => CATS.includes(t)) || "" : "";
   app.innerHTML = `
-    <div class="topbar"><h1>${person ? esc(person.name) : "快速排盤"}</h1>
+    <div class="topbar">
+      <div class="row"><h1>${person ? esc(person.name) : "快速排盤"}</h1>
+      ${person ? `<select onchange="setPersonCat('${person.id}', this.value)"
+        style="width:auto;padding:6px 10px;font-size:.9rem;border-radius:999px">
+        <option value="">未分類</option>
+        ${CATS.map((cat) => `<option${cat === curCatOf ? " selected" : ""}>${cat}</option>`).join("")}
+      </select>` : ""}</div>
       <button class="ghost sm" onclick="viewHome()">← 返回</button></div>
-    <div class="muted" style="margin:-6px 0 10px">${esc(a.birthday||"")}｜主性格 <b style="color:var(--gold2)">${m.n} 號人</b>｜${esc(d.label)}</div>
+    <div class="muted" style="margin:0 0 10px">${esc(a.birthday||"")}｜主性格 <b style="color:var(--gold2)">${m.n} 號人</b>｜${esc(d.label)}</div>
 
     <div class="card"><div class="label">全息圖</div>${chartSvg(c)}
       ${weightGrid(a)}
@@ -193,10 +200,6 @@ function renderAnalysis(person, a) {
       ${s.nums.map((x)=>`<div>${x.tag?`<span class="muted">${esc(x.tag)} </span>`:""}<b>${x.n}</b>｜${esc(x.gift)}｜${esc(x.talent)}</div>`).join("")}
     </div>`).join("")}
 
-    ${person ? `<div class="card"><div class="label">分類（點選即存）</div>
-      <div class="row">${CATS.map((cat) => `<span class="chip tap${(person.tags||[]).includes(cat) ? " sel" : ""}"
-        onclick="toggleTag('${person.id}', '${cat}')">${cat}</span>`).join("")}</div></div>` : ""}
-
     ${person ? `<div class="card"><div class="label">複盤筆記</div>
       <div id="notes">${(person.notes||[]).map((n)=>`<div class="note">${esc(n.text)}<div class="muted">${n.ts.slice(0,10)}</div></div>`).join("")||'<div class="muted">還沒有筆記</div>'}</div>
       <div class="sec"><textarea id="newnote" rows="2" placeholder="這次聊完：哪裡準、哪裡不準、下一步…"></textarea></div>
@@ -233,11 +236,11 @@ function chartSvg(c) {
   </svg>`;
 }
 
-async function toggleTag(id, cat) {
-  const tags = new Set(window.curPerson?.tags || []);
-  tags.has(cat) ? tags.delete(cat) : tags.add(cat);
-  await api("/people/" + id, { method: "PATCH", body: JSON.stringify({ tags: [...tags] }) });
-  viewPerson(id);
+async function setPersonCat(id, cat) {
+  const keep = (window.curPerson?.tags || []).filter((t) => !CATS.includes(t)); // 保留非分類的舊標籤
+  const tags = cat ? [cat, ...keep] : keep;
+  await api("/people/" + id, { method: "PATCH", body: JSON.stringify({ tags }) });
+  if (window.curPerson) window.curPerson.tags = tags;
 }
 async function addNote(id) {
   const text = $("#newnote").value.trim();
