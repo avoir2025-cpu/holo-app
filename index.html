@@ -158,7 +158,8 @@ function renderAnalysis(person, a) {
       <button class="ghost sm" onclick="viewHome()">← 返回</button></div>
     <div class="row" style="margin:0 0 10px;justify-content:space-between">
       <span class="muted">${esc(a.birthday||"")}｜主性格 <b style="color:var(--gold2)">${m.n} 號人</b>｜${esc(d.label)}</span>
-      ${person && !(person.tags||[]).includes("本人") ? `<button class="ghost sm" onclick="goCompare()">⇄ 本人對照</button>` : ""}
+      <span class="row">${person ? `<button class="ghost sm" onclick="viewEdit()">✎ 編輯</button>` : ""}
+      ${person && !(person.tags||[]).includes("本人") ? `<button class="ghost sm" onclick="goCompare()">⇄ 本人對照</button>` : ""}</span>
     </div>
 
     <div class="card"><div class="label">全息圖</div>${chartSvg(c)}
@@ -220,7 +221,7 @@ function renderAnalysis(person, a) {
       <div class="sec"><textarea id="newnote" rows="2" placeholder="這次聊完：哪裡準、哪裡不準、下一步…"></textarea></div>
       <div class="row" style="margin-top:6px"><span class="label" style="margin:0">這次判讀：</span>${["準","部分","不準"].map((v)=>`<span class="chip tap" data-v="${v}" onclick="selVerd(this)">${v}</span>`).join("")}</div>
       <div class="row sec"><button class="sm" onclick="addNote('${person.id}')">存筆記</button>
-      <button class="ghost sm" onclick="delPerson('${person.id}')">刪除此人</button></div></div>` : ""}`;
+      <button class="ghost sm" onclick="delPerson('${person.id}', this)">刪除此人</button></div></div>` : ""}`;
 }
 
 function weightGrid(a) {
@@ -310,10 +311,32 @@ function renderCompare(meR, otR) {
       ${me.doctrine.key !== ot.doctrine.key ? `<div class="sec muted">提醒：你是${esc(me.doctrine.label)}（${esc(me.doctrine.talk)}），對方是${esc(ot.doctrine.label)}（${esc(ot.doctrine.talk)}）——別用你自己習慣被打動的方式去談他。</div>` : ""}
     </div>`;
 }
-async function delPerson(id) {
-  if (!confirm("確定刪除？")) return;
+async function delPerson(id, el) {
+  if (el && !el.dataset.armed) {  // 按兩次確認（LINE 內建瀏覽器可能擋 confirm 彈窗）
+    el.dataset.armed = "1"; el.textContent = "⚠ 再按一次確認刪除";
+    setTimeout(() => { el.dataset.armed = ""; el.textContent = "刪除此人"; }, 3000);
+    return;
+  }
   await api("/people/" + id, { method: "DELETE" });
   viewHome();
+}
+function viewEdit() {
+  const p = window.curPerson; if (!p) return;
+  app.innerHTML = `
+    <div class="topbar"><h1>編輯 ${esc(p.name)}</h1>
+      <button class="ghost sm" onclick="viewPerson('${p.id}')">← 返回</button></div>
+    <div class="card">
+      <div class="label">姓名</div><input id="e_name" value="${esc(p.name)}">
+      <div class="label sec">生日（國曆西元）</div><input id="e_bd" type="date" value="${p.birthday}">
+      <div class="sec"><button onclick="doSaveEdit('${p.id}')">儲存並重新排盤</button></div>
+      <div id="msg"></div></div>`;
+}
+async function doSaveEdit(id) {
+  try {
+    await api("/people/" + id, { method: "PATCH",
+      body: JSON.stringify({ name: $("#e_name").value.trim(), birthday: $("#e_bd").value }) });
+    viewPerson(id);
+  } catch (e) { $("#msg").innerHTML = `<div class="err">${esc(e.message)}</div>`; }
 }
 function deb(fn, ms) { let h; return (...a) => { clearTimeout(h); h = setTimeout(() => fn(...a), ms); }; }
 
